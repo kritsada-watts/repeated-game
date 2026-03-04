@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 # ==========================================
-# 1. กำหนดพฤติกรรมตัวละครทั้ง 7 ตัว
+# 1. กำหนดพฤติกรรมตัวละครทั้ง 8 ตัว (เพิ่ม Opportunist)
 # ==========================================
 def char_always_cooperate(history): return "Cooperate"
 def char_always_cheat(history): return "Cheat"
@@ -15,12 +15,24 @@ def char_grudger(history): return "Cheat" if "Cheat" in history else "Cooperate"
 def char_tit_for_two_tats(history): 
     return "Cheat" if len(history) >= 2 and history[-1] == "Cheat" and history[-2] == "Cheat" else "Cooperate"
 def char_alternator(history): return "Cooperate" if len(history) % 2 == 0 else "Cheat"
+def char_opportunist(history): 
+    # ถ้านิสิตยอม Cooperate ติดต่อกัน 2 ครั้งล่าสุด แอบแทงข้างหลัง (Cheat) เพื่อฉวยโอกาส
+    if len(history) >= 2 and history[-1] == "Cooperate" and history[-2] == "Cooperate":
+        return "Cheat"
+    # ถ้าไม่ใช่ ให้ทำตัวเหมือนคนเลียนแบบ (Tit-for-Tat)
+    return "Cooperate" if not history else history[-1]
 
 CHARACTERS = {
-    "Angel (คนใจดี)": char_always_cooperate, "Devil (คนเห็นแก่ตัว)": char_always_cheat, "Copycat (คนเลียนแบบ)": char_tit_for_tat,
-    "Skeptic (คนขี้ระแวง)": char_suspicious_tft, "Grudger (คนเจ้าคิดเจ้าแค้น)": char_grudger, "Tolerant (คนใจเย็น)": char_tit_for_two_tats,
-    "Alternator (คนโลเล)": char_alternator
+    "Angel (คนใจดี)": char_always_cooperate, 
+    "Devil (คนเห็นแก่ตัว)": char_always_cheat, 
+    "Copycat (คนเลียนแบบ)": char_tit_for_tat,
+    "Skeptic (คนขี้ระแวง)": char_suspicious_tft, 
+    "Grudger (คนเจ้าคิดเจ้าแค้น)": char_grudger, 
+    "Tolerant (คนใจเย็น)": char_tit_for_two_tats,
+    "Alternator (คนโลเล)": char_alternator,
+    "Opportunist (นักฉวยโอกาส)": char_opportunist
 }
+TOTAL_CHARS = len(CHARACTERS) # ตัวแปรเก็บจำนวนตัวละครทั้งหมด (ตอนนี้คือ 8)
 
 # ==========================================
 # 2. ฟังก์ชันตรวจสอบการเล่นซ้ำและเตรียม Session
@@ -28,7 +40,6 @@ CHARACTERS = {
 def check_already_played(student_id):
     if os.path.exists("game_results.csv"):
         df = pd.read_csv("game_results.csv")
-        # แปลงเป็น string เพื่อป้องกันปัญหาตอนเทียบข้อมูล
         played_ids = df['Student_ID'].astype(str).tolist()
         if str(student_id).strip() in played_ids:
             return True
@@ -54,13 +65,13 @@ def init_game_session():
 # ==========================================
 st.title("🎭 Game Theory: The Repeated Game")
 
-# --- แสดง Payoff Matrix ให้นิสิตดูเป็นกติกา ---
+# ปรับปรุงตาราง Payoff ให้เจ็บปวดขึ้น
 with st.expander("📊 ดูตารางผลตอบแทน (Payoff Matrix) กติกาการให้คะแนน", expanded=True):
     st.markdown("""
     | การตัดสินใจ (คุณ \ คู่แข่ง) | 🤝 คู่แข่งเลือก Cooperate | 🗡️ คู่แข่งเลือก Cheat |
     | :--- | :--- | :--- |
-    | **🤝 คุณเลือก Cooperate** | คุณได้ **2** , คู่แข่งได้ 2 | คุณเสีย **-1** , คู่แข่งได้ 3 |
-    | **🗡️ คุณเลือก Cheat** | คุณได้ **3** , คู่แข่งเสีย -1 | คุณได้ **0** , คู่แข่งได้ 0 |
+    | **🤝 คุณเลือก Cooperate** | คุณได้ **2** , คู่แข่งได้ 2 | คุณเสีย **-3** , คู่แข่งได้ 4 |
+    | **🗡️ คุณเลือก Cheat** | คุณได้ **4** , คู่แข่งเสีย -3 | คุณได้ **0** , คู่แข่งได้ 0 |
     """)
 
 # --- ส่วนหน้า Login ---
@@ -73,28 +84,47 @@ if not st.session_state.logged_in:
     with col2:
         student_name = st.text_input("ชื่อ-นามสกุล (Name-Surname):")
         
+    high_school = st.text_input("ชื่อโรงเรียนระดับมัธยมศึกษา (เพื่อยืนยันตัวตน):")
+        
     if st.button("เริ่มเกม", type="primary", use_container_width=True):
-        if student_id.strip() == "" or student_name.strip() == "":
-            st.error("⚠️ กรุณากรอกรหัสนิสิตและชื่อ-นามสกุลให้ครบถ้วนครับ!")
+        if student_id.strip() == "" or student_name.strip() == "" or high_school.strip() == "":
+            st.error("⚠️ กรุณากรอกข้อมูล รหัสนิสิต ชื่อ-นามสกุล และชื่อโรงเรียนมัธยม ให้ครบถ้วนครับ!")
         elif check_already_played(student_id):
             st.error("❌ นิสิตรหัสนี้ได้ทำการเล่นและบันทึกคะแนนไปแล้ว ไม่สามารถเล่นซ้ำได้ครับ")
         else:
             st.session_state.student_id = student_id
             st.session_state.student_name = student_name
+            st.session_state.high_school = high_school
             st.session_state.logged_in = True
             init_game_session()
             st.rerun()
             
-    # ปุ่มลับสำหรับอาจารย์โหลดข้อมูล
+    # --- ส่วนจัดการข้อมูลสำหรับอาจารย์ (ป้องกันด้วยรหัสผ่าน) ---
     st.markdown("---")
-    if os.path.exists("game_results.csv"):
-        with open("game_results.csv", "rb") as file:
-            st.download_button(
-                label="📥 (สำหรับอาจารย์) ดาวน์โหลดผลคะแนน CSV", 
-                data=file, 
-                file_name="game_results.csv", 
-                mime="text/csv"
-            )
+    with st.expander("🔒 สำหรับอาจารย์ผู้สอน (Instructor Area)"):
+        admin_password = st.text_input("ใส่รหัสผ่านเพื่อเข้าถึงข้อมูล:", type="password")
+        
+        # รหัสผ่านคือ 123456 (คุณสามารถเปลี่ยนตัวเลขนี้ในโค้ดได้เลย)
+        if admin_password == "123456": 
+            if os.path.exists("game_results.csv"):
+                with open("game_results.csv", "rb") as file:
+                    st.download_button(
+                        label="📥 ดาวน์โหลดผลคะแนนทั้งหมด (CSV)", 
+                        data=file, 
+                        file_name="game_results.csv", 
+                        mime="text/csv"
+                    )
+                
+                st.markdown("<hr>", unsafe_allow_html=True)
+                st.warning("⚠️ ระวัง: การกดปุ่มด้านล่างจะลบข้อมูลผลการเล่นของทุกคนทิ้งอย่างถาวร")
+                if st.button("🗑️ ล้างข้อมูลทั้งหมด (Reset Data)", type="secondary"):
+                    os.remove("game_results.csv")
+                    st.success("✅ ลบข้อมูลเก่าทิ้งเรียบร้อยแล้ว!")
+                    st.rerun()
+            else:
+                st.info("📂 ยังไม่มีนิสิตเข้ามาเล่นเกม (ไม่มีข้อมูลให้ดาวน์โหลดหรือลบ)")
+        elif admin_password != "":
+            st.error("❌ รหัสผ่านไม่ถูกต้อง")
 
 # --- ส่วนหน้าเล่นเกม ---
 else:
@@ -103,13 +133,14 @@ else:
         st.info(f"**ผู้เล่น:** {st.session_state.student_name} ({st.session_state.student_id})")
         st.metric("คะแนนรวมของคุณคือ", st.session_state.score)
         
-        # บันทึกข้อมูล
+        # บันทึกข้อมูลลง CSV
         if not st.session_state.saved:
             file_name = "game_results.csv"
             new_data = pd.DataFrame([{
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "Student_ID": st.session_state.student_id,
                 "Name": st.session_state.student_name,
+                "High_School": st.session_state.high_school,
                 "Total_Score": st.session_state.score,
                 "History": ",".join(st.session_state.player_history)
             }])
@@ -138,36 +169,36 @@ else:
         st.write(f"👤 **ผู้เล่น:** {st.session_state.student_name} ({st.session_state.student_id})")
         st.markdown("---")
         
-        # ทำให้กล่องข้อมูลตัวละครและรอบโดดเด่นขึ้น
         col_info1, col_info2 = st.columns(2)
         with col_info1:
-            st.info(f"🎭 **กำลังเผชิญหน้ากับ:**\n\n### ผู้เล่นปริศนาคนที่ {char_index + 1}/7")
+            # ปรับตัวเลข 7 เป็นตัวแปร TOTAL_CHARS อัตโนมัติ
+            st.info(f"🎭 **กำลังเผชิญหน้ากับ:**\n\n### ผู้เล่นปริศนาคนที่ {char_index + 1}/{TOTAL_CHARS}")
         with col_info2:
             st.success(f"⚔️ **สถานะการแข่งขัน:**\n\n### รอบที่ {current_round_with_char} / {ROUNDS_PER_CHAR}")
             
         st.progress(current_round_with_char / ROUNDS_PER_CHAR)
-        st.markdown("<br>", unsafe_allow_html=True) # เว้นบรรทัดนิดหน่อยให้ดูสบายตา
+        st.markdown("<br>", unsafe_allow_html=True)
 
         def play(player_choice):
             start_idx = char_index * ROUNDS_PER_CHAR
             history_with_char = st.session_state.player_history[start_idx:]
             bot_choice = CHARACTERS[current_char](history_with_char)
             
+            # ปรับปรุงคะแนน Payoff ตามกติกาใหม่
             p_score = 0
             if player_choice == "Cheat" and bot_choice == "Cheat": p_score = 0
-            elif player_choice == "Cheat" and bot_choice == "Cooperate": p_score = 3
+            elif player_choice == "Cheat" and bot_choice == "Cooperate": p_score = 4 # ได้ 4 ถ้าหลอกคนดี
             elif player_choice == "Cooperate" and bot_choice == "Cooperate": p_score = 2
-            elif player_choice == "Cooperate" and bot_choice == "Cheat": p_score = -1
+            elif player_choice == "Cooperate" and bot_choice == "Cheat": p_score = -3 # เสีย 3 ถ้าโดนหลอก
                 
             st.session_state.score += p_score
             st.session_state.player_history.append(player_choice)
             st.session_state.total_rounds += 1
             st.session_state.last_result = f"คุณเลือก **{player_choice}** | คู่แข่งเลือก **{bot_choice}** ➡️ คุณได้คะแนน **{p_score}** แต้ม"
             
-            if st.session_state.total_rounds >= len(CHARACTERS) * ROUNDS_PER_CHAR:
+            if st.session_state.total_rounds >= TOTAL_CHARS * ROUNDS_PER_CHAR:
                 st.session_state.game_over = True
 
-        # ปุ่มกดตัดสินใจ
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
             if st.button("🤝 เลือก Cooperate (ร่วมมือ)", use_container_width=True):
@@ -178,7 +209,6 @@ else:
                 play("Cheat")
                 st.rerun()
                 
-        # แสดงผลลัพธ์ของตาล่าสุด และคะแนนสะสม
         st.markdown("---")
         if st.session_state.last_result:
             st.warning(st.session_state.last_result)
