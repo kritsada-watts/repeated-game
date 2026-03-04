@@ -69,7 +69,7 @@ st.title("🎭 Game Theory: The Repeated Game")
 with st.expander("📊 ดูตารางผลตอบแทน (Payoff Matrix) กติกาการให้คะแนน", expanded=True):
     st.markdown("""
     | การตัดสินใจ (นิสิต \ คู่แข่ง) | 🤝 คู่แข่งเลือก Cooperate | 🗡️ คู่แข่งเลือก Cheat |
-    | :--- | :--- | :--- |
+    | :---: | :---: | :---: |
     | **🤝 นิสิตเลือก Cooperate** | **2**, 2 | **-3** , 4 |
     | **🗡️ นิสิตเลือก Cheat** | **4** , -3 | **0** , 0 |
     """)
