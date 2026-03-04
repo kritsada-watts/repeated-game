@@ -105,7 +105,7 @@ if not st.session_state.logged_in:
         admin_password = st.text_input("ใส่รหัสผ่านเพื่อเข้าถึงข้อมูล:", type="password")
         
         # รหัสผ่านคือ 123456 (คุณสามารถเปลี่ยนตัวเลขนี้ในโค้ดได้เลย)
-        if admin_password == "123456xxx": 
+        if admin_password == st.secrets["admin_password"]: 
             if os.path.exists("game_results.csv"):
                 with open("game_results.csv", "rb") as file:
                     st.download_button(
