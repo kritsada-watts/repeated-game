@@ -65,6 +65,13 @@ def init_game_session():
 # ==========================================
 st.title("🎭 Game Theory: The Repeated Game")
 
+# โค้ดสำหรับซ่อนเมนูและแถบด้านบนของ Streamlit
+st.markdown("""
+    <style>
+    .stApp header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
 # ปรับปรุงตาราง Payoff ให้เจ็บปวดขึ้น
 with st.expander("📊 ดูตารางผลตอบแทน (Payoff Matrix) กติกาการให้คะแนน", expanded=True):
     st.markdown("""
