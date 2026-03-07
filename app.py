@@ -3,9 +3,10 @@ import random
 import pandas as pd
 import os
 from datetime import datetime
+import requests  # เครื่องมือใหม่สำหรับส่งข้อมูลไป Google Sheets
 
 # ==========================================
-# 1. กำหนดพฤติกรรมตัวละครทั้ง 8 ตัว (เพิ่ม Opportunist)
+# 1. กำหนดพฤติกรรมตัวละครทั้ง 8 ตัว
 # ==========================================
 def char_always_cooperate(history): return "Cooperate"
 def char_always_cheat(history): return "Cheat"
@@ -16,10 +17,8 @@ def char_tit_for_two_tats(history):
     return "Cheat" if len(history) >= 2 and history[-1] == "Cheat" and history[-2] == "Cheat" else "Cooperate"
 def char_alternator(history): return "Cooperate" if len(history) % 2 == 0 else "Cheat"
 def char_opportunist(history): 
-    # ถ้านิสิตยอม Cooperate ติดต่อกัน 2 ครั้งล่าสุด แอบแทงข้างหลัง (Cheat) เพื่อฉวยโอกาส
     if len(history) >= 2 and history[-1] == "Cooperate" and history[-2] == "Cooperate":
         return "Cheat"
-    # ถ้าไม่ใช่ ให้ทำตัวเหมือนคนเลียนแบบ (Tit-for-Tat)
     return "Cooperate" if not history else history[-1]
 
 CHARACTERS = {
@@ -32,10 +31,10 @@ CHARACTERS = {
     "Alternator (คนโลเล)": char_alternator,
     "Opportunist (นักฉวยโอกาส)": char_opportunist
 }
-TOTAL_CHARS = len(CHARACTERS) # ตัวแปรเก็บจำนวนตัวละครทั้งหมด (ตอนนี้คือ 8)
+TOTAL_CHARS = len(CHARACTERS)
 
 # ==========================================
-# 2. ฟังก์ชันตรวจสอบการเล่นซ้ำและเตรียม Session
+# 2. ฟังก์ชันตรวจสอบและเตรียม Session
 # ==========================================
 def check_already_played(student_id):
     if os.path.exists("game_results.csv"):
@@ -65,19 +64,18 @@ def init_game_session():
 # ==========================================
 st.title("🎭 Game Theory: The Repeated Game")
 
-# โค้ดสำหรับซ่อนเมนูและแถบด้านบนของ Streamlit
+# ซ่อนเมนูขยะด้านบนของ Streamlit
 st.markdown("""
     <style>
     .stApp header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# ปรับปรุงตาราง Payoff ให้เจ็บปวดขึ้น
 with st.expander("📊 ดูตารางผลตอบแทน (Payoff Matrix) กติกาการให้คะแนน", expanded=True):
     st.markdown("""
     | การตัดสินใจ (นิสิต \ คู่แข่ง) | 🤝 คู่แข่งเลือก Cooperate | 🗡️ คู่แข่งเลือก Cheat |
     | :---: | :---: | :---: |
-    | **🤝 นิสิตเลือก Cooperate** | **2**, 2 | **-3** , 4 |
+    | **🤝 นิสิตเลือก Cooperate** | **2** , 2 | **-3** , 4 |
     | **🗡️ นิสิตเลือก Cheat** | **4** , -3 | **0** , 0 |
     """)
 
@@ -106,30 +104,28 @@ if not st.session_state.logged_in:
             init_game_session()
             st.rerun()
             
-    # --- ส่วนจัดการข้อมูลสำหรับอาจารย์ (ป้องกันด้วยรหัสผ่าน) ---
+    # --- ส่วนจัดการข้อมูลสำหรับอาจารย์ ---
     st.markdown("---")
     with st.expander("🔒 สำหรับอาจารย์ผู้สอน (Instructor Area)"):
         admin_password = st.text_input("ใส่รหัสผ่านเพื่อเข้าถึงข้อมูล:", type="password")
         
-        # รหัสผ่านคือ 123456 (คุณสามารถเปลี่ยนตัวเลขนี้ในโค้ดได้เลย)
         if admin_password == st.secrets["admin_password"]: 
             if os.path.exists("game_results.csv"):
                 with open("game_results.csv", "rb") as file:
                     st.download_button(
-                        label="📥 ดาวน์โหลดผลคะแนนทั้งหมด (CSV)", 
+                        label="📥 ดาวน์โหลดไฟล์สำรอง (CSV)", 
                         data=file, 
                         file_name="game_results.csv", 
                         mime="text/csv"
                     )
-                
                 st.markdown("<hr>", unsafe_allow_html=True)
-                st.warning("⚠️ ระวัง: การกดปุ่มด้านล่างจะลบข้อมูลผลการเล่นของทุกคนทิ้งอย่างถาวร")
-                if st.button("🗑️ ล้างข้อมูลทั้งหมด (Reset Data)", type="secondary"):
+                st.warning("⚠️ การล้างข้อมูล จะลบเฉพาะไฟล์สำรองในระบบนี้เท่านั้น (ไม่กระทบข้อมูลใน Google Sheets)")
+                if st.button("🗑️ ล้างไฟล์สำรองทั้งหมด", type="secondary"):
                     os.remove("game_results.csv")
-                    st.success("✅ ลบข้อมูลเก่าทิ้งเรียบร้อยแล้ว!")
+                    st.success("✅ ลบไฟล์สำรองเก่าทิ้งเรียบร้อยแล้ว!")
                     st.rerun()
             else:
-                st.info("📂 ยังไม่มีนิสิตเข้ามาเล่นเกม (ไม่มีข้อมูลให้ดาวน์โหลดหรือลบ)")
+                st.info("📂 ยังไม่มีข้อมูลสำรองในเซิร์ฟเวอร์")
         elif admin_password != "":
             st.error("❌ รหัสผ่านไม่ถูกต้อง")
 
@@ -140,27 +136,42 @@ else:
         st.info(f"**ผู้เล่น:** {st.session_state.student_name} ({st.session_state.student_id})")
         st.metric("คะแนนรวมของคุณคือ", st.session_state.score)
         
-        # บันทึกข้อมูลลง CSV
+        # ระบบบันทึกข้อมูลแบบคู่ (Google Sheets + CSV สำรอง)
         if not st.session_state.saved:
-            file_name = "game_results.csv"
-            new_data = pd.DataFrame([{
-                "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            timestamp_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            history_str = ",".join(st.session_state.player_history)
+            
+            data_to_save = {
+                "Timestamp": timestamp_now,
                 "Student_ID": st.session_state.student_id,
                 "Name": st.session_state.student_name,
                 "High_School": st.session_state.high_school,
                 "Total_Score": st.session_state.score,
-                "History": ",".join(st.session_state.player_history)
-            }])
+                "History": history_str
+            }
             
+            # 1. บันทึกลงไฟล์สำรอง (เพื่อใช้เช็คไม่ให้คนเดิมกดเล่นซ้ำในเซสชันเดียวกัน)
+            file_name = "game_results.csv"
+            new_data_df = pd.DataFrame([data_to_save])
             if os.path.exists(file_name):
                 existing_data = pd.read_csv(file_name)
-                updated_data = pd.concat([existing_data, new_data], ignore_index=True)
+                updated_data = pd.concat([existing_data, new_data_df], ignore_index=True)
             else:
-                updated_data = new_data
-                
+                updated_data = new_data_df
             updated_data.to_csv(file_name, index=False)
+            
+            # 2. ส่งข้อมูลไปเก็บถาวรที่ Google Sheets อย่างปลอดภัย
+            try:
+                webhook_url = st.secrets["google_sheet_url"]
+                response = requests.post(webhook_url, data=data_to_save)
+                if response.status_code == 200:
+                    st.info("✅ ระบบได้ส่งคะแนนของคุณเข้าสู่ **Google Sheets** ของรายวิชาเรียบร้อยแล้ว สามารถกดปุ่มออกจากระบบได้เลยครับ")
+                else:
+                    st.warning("⚠️ บันทึกในระบบสำรองแล้ว แต่เชื่อมต่อ Google Sheets ไม่สำเร็จ กรุณาแคปหน้าจอนี้ส่งให้อาจารย์")
+            except Exception as e:
+                st.warning("⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาแคปหน้าจอคะแนนส่งให้อาจารย์")
+                
             st.session_state.saved = True
-            st.info("✅ ระบบได้บันทึกคะแนนของคุณเรียบร้อยแล้ว สามารถกดปุ่มด้านล่างเพื่อออกจากระบบ")
             
         if st.button("กลับหน้าหลัก (Log out)", type="primary"):
             for key in list(st.session_state.keys()):
@@ -178,7 +189,6 @@ else:
         
         col_info1, col_info2 = st.columns(2)
         with col_info1:
-            # ปรับตัวเลข 7 เป็นตัวแปร TOTAL_CHARS อัตโนมัติ
             st.info(f"🎭 **กำลังเผชิญหน้ากับ:**\n\n### ผู้เล่นปริศนาคนที่ {char_index + 1}/{TOTAL_CHARS}")
         with col_info2:
             st.success(f"⚔️ **สถานะการแข่งขัน:**\n\n### รอบที่ {current_round_with_char} / {ROUNDS_PER_CHAR}")
@@ -191,12 +201,11 @@ else:
             history_with_char = st.session_state.player_history[start_idx:]
             bot_choice = CHARACTERS[current_char](history_with_char)
             
-            # ปรับปรุงคะแนน Payoff ตามกติกาใหม่
             p_score = 0
             if player_choice == "Cheat" and bot_choice == "Cheat": p_score = 0
-            elif player_choice == "Cheat" and bot_choice == "Cooperate": p_score = 4 # ได้ 4 ถ้าหลอกคนดี
+            elif player_choice == "Cheat" and bot_choice == "Cooperate": p_score = 4
             elif player_choice == "Cooperate" and bot_choice == "Cooperate": p_score = 2
-            elif player_choice == "Cooperate" and bot_choice == "Cheat": p_score = -3 # เสีย 3 ถ้าโดนหลอก
+            elif player_choice == "Cooperate" and bot_choice == "Cheat": p_score = -3
                 
             st.session_state.score += p_score
             st.session_state.player_history.append(player_choice)
